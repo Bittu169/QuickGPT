@@ -23,8 +23,7 @@ export const stripeWebhook = async (req, res) => {
       process.env.STRIPE_WEBHOOK_SECRET
     );
 
-    console.log("🔥 WEBHOOK:", event.type);
-
+    console.log("🔥 WEBHOOK RECEIVED:", event.type);
   } catch (err) {
     console.error("❌ Stripe signature failed:", err.message);
     return res.status(400).send(`Webhook Error: ${err.message}`);
@@ -36,30 +35,45 @@ export const stripeWebhook = async (req, res) => {
       case "checkout.session.completed": {
         const session = event.data.object;
 
-        const { transactionId, appId } = session.metadata || {};
+        // DEBUG (keep for production troubleshooting)
+        console.log("📦 SESSION METADATA:", session.metadata);
 
+        const transactionId = session.metadata?.transactionId;
+        const appId = session.metadata?.appId;
+
+        // validate metadata
         if (!transactionId || appId !== "quickgpt") {
-          console.log("⚠️ Ignored session:", session.id);
+          console.log("⚠️ Invalid metadata, skipping webhook");
           return res.status(200).json({ received: true });
         }
 
-        const transaction = await Transaction.findOneAndUpdate(
-          { _id: transactionId, isPaid: { $ne: true } },
+        // STEP 1: mark transaction as paid (SAFE UPDATE)
+        const transaction = await Transaction.findByIdAndUpdate(
+          transactionId,
           { $set: { isPaid: true } },
-          { new: false }
+          { new: true }
         );
 
         if (!transaction) {
-          console.log("⚠️ Already processed or missing:", transactionId);
+          console.log("❌ Transaction not found:", transactionId);
           return res.status(200).json({ received: true });
         }
 
-        await User.updateOne(
-          { _id: transaction.userId },
+        console.log("✅ Transaction marked as paid:", transaction._id);
+
+        // STEP 2: update user credits
+        await User.findByIdAndUpdate(
+          transaction.userId,
           { $inc: { credits: transaction.credits } }
         );
 
-        console.log("✅ Credits added:", transaction.userId);
+        console.log(
+          "💰 Credits updated for user:",
+          transaction.userId,
+          "Credits added:",
+          transaction.credits
+        );
+
         break;
       }
 

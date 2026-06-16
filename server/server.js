@@ -8,6 +8,7 @@ import userRouter from "./routes/userRoutes.js";
 import chatRouter from "./routes/chatRoutes.js";
 import messageRouter from "./routes/messageRoutes.js";
 import creditRouter from "./routes/creditRoutes.js";
+import stripeRouter from "./routes/stripeRoutes.js"; // 👈 ADD THIS
 
 const app = express();
 
@@ -16,6 +17,8 @@ await connectDB();
 
 // Middleware
 app.use(cors());
+
+// ⚠️ IMPORTANT: do NOT apply json globally for stripe webhook
 app.use(express.json({ limit: "10mb" }));
 
 // Routes
@@ -27,6 +30,9 @@ app.use("/api/user", userRouter);
 app.use("/api/chat", chatRouter);
 app.use("/api/message", messageRouter);
 app.use("/api/credit", creditRouter);
+
+// 🔥 STRIPE WEBHOOK ROUTE (MUST BE SEPARATE FILE USING express.raw)
+app.use("/api/stripe", stripeRouter);
 
 // Error Handler
 app.use((err, req, res, next) => {
