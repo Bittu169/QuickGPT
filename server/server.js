@@ -8,20 +8,37 @@ import userRouter from "./routes/userRoutes.js";
 import chatRouter from "./routes/chatRoutes.js";
 import messageRouter from "./routes/messageRoutes.js";
 import creditRouter from "./routes/creditRoutes.js";
-import stripeRouter from "./routes/stripeRoutes.js"; // 👈 ADD THIS
+import stripeRouter from "./routes/stripeRoutes.js";
 
 const app = express();
 
 // Connect Database
 await connectDB();
 
-// Middleware
+// CORS
 app.use(cors());
 
-// ⚠️ IMPORTANT: do NOT apply json globally for stripe webhook
+/*
+|--------------------------------------------------------------------------
+| STRIPE WEBHOOK ROUTE
+|--------------------------------------------------------------------------
+| Must be BEFORE express.json()
+| Stripe needs the raw request body for signature verification.
+*/
+app.use("/api/stripe", stripeRouter);
+
+/*
+|--------------------------------------------------------------------------
+| JSON Middleware
+|--------------------------------------------------------------------------
+*/
 app.use(express.json({ limit: "10mb" }));
 
-// Routes
+/*
+|--------------------------------------------------------------------------
+| Routes
+|--------------------------------------------------------------------------
+*/
 app.get("/", (req, res) => {
     res.send("Server is live!");
 });
@@ -31,12 +48,13 @@ app.use("/api/chat", chatRouter);
 app.use("/api/message", messageRouter);
 app.use("/api/credit", creditRouter);
 
-// 🔥 STRIPE WEBHOOK ROUTE (MUST BE SEPARATE FILE USING express.raw)
-app.use("/api/stripe", stripeRouter);
-
-// Error Handler
+/*
+|--------------------------------------------------------------------------
+| Error Handler
+|--------------------------------------------------------------------------
+*/
 app.use((err, req, res, next) => {
-    console.error(err.stack);
+    console.error(err);
 
     res.status(500).json({
         success: false,
@@ -44,7 +62,11 @@ app.use((err, req, res, next) => {
     });
 });
 
-// Start Server
+/*
+|--------------------------------------------------------------------------
+| Start Server
+|--------------------------------------------------------------------------
+*/
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
