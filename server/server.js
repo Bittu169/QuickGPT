@@ -9,27 +9,14 @@ import chatRouter from "./routes/chatRoutes.js";
 import messageRouter from "./routes/messageRoutes.js";
 import creditRouter from "./routes/creditRoutes.js";
 
-import { stripeWebhooks } from "./controllers/webhooks.js";
-
 const app = express();
 
 // Connect Database
 await connectDB();
 
-// Stripe Webhook Route
-// MUST be before express.json()
-app.post(
-    "/api/stripe",
-    express.raw({ type: "application/json" }),
-    stripeWebhooks
-);
-
 // Middleware
 app.use(cors());
-
-app.use(express.json({
-    limit: "10mb"
-}));
+app.use(express.json({ limit: "10mb" }));
 
 // Routes
 app.get("/", (req, res) => {
