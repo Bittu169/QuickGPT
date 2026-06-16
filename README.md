@@ -92,6 +92,24 @@ Backend: https://your-backend-url.vercel.app
 
 ---
 
+# 📸 Screenshots
+
+Add screenshots here:
+
+### Home Page
+
+![Home](https://github.com/Bittu169/QuickGPT/blob/a5f0890ed46227a2dd73cb519838e48d98a5269b/Screenshot%202026-06-16%20190006.png)
+
+### Chat Interface
+
+![Chat](https://github.com/Bittu169/QuickGPT/blob/a5f0890ed46227a2dd73cb519838e48d98a5269b/Screenshot%202026-06-16%20190023.png)
+
+### Pricing Page
+
+![Pricing](https://github.com/Bittu169/QuickGPT/blob/a5f0890ed46227a2dd73cb519838e48d98a5269b/Screenshot%202026-06-16%20190103.png)
+
+---
+
 # 📁 Project Structure
 
 ```bash
@@ -225,23 +243,6 @@ http://localhost:3000
 
 ---
 
-# 📸 Screenshots
-
-Add screenshots here:
-
-### Home Page
-
-![Home](screenshots/home.png)
-
-### Chat Interface
-
-![Chat](screenshots/chat.png)
-
-### Pricing Page
-
-![Pricing](screenshots/pricing.png)
-
----
 
 # 🔮 Future Improvements
 
