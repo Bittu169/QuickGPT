@@ -7,6 +7,16 @@ export const stripeWebhooks = async (req, res) => {
 
     const sig = req.headers["stripe-signature"];
 
+    console.log("\n========== WEBHOOK REQUEST ==========");
+    console.log("Signature Header:", sig ? "Present" : "Missing");
+    console.log(
+        "Webhook Secret:",
+        process.env.STRIPE_WEBHOOK_SECRET
+            ? "Present"
+            : "Missing"
+    );
+    console.log("=====================================\n");
+
     let event;
 
     try {
@@ -16,12 +26,17 @@ export const stripeWebhooks = async (req, res) => {
             process.env.STRIPE_WEBHOOK_SECRET
         );
 
-        console.log("========== WEBHOOK HIT ==========");
+        console.log("\n========== WEBHOOK VERIFIED ==========");
         console.log("Event Type:", event.type);
-        console.log("=================================");
+        console.log("======================================\n");
     } catch (error) {
-        console.error("Webhook Signature Error:", error.message);
-        return res.status(400).send(`Webhook Error: ${error.message}`);
+        console.error("\n========== WEBHOOK ERROR ==========");
+        console.error(error.message);
+        console.error("===================================\n");
+
+        return res.status(400).send(
+            `Webhook Error: ${error.message}`
+        );
     }
 
     try {
@@ -32,50 +47,71 @@ export const stripeWebhooks = async (req, res) => {
                 const session = event.data.object;
 
                 console.log("Session ID:", session.id);
-                console.log("Session Metadata:", session.metadata);
+                console.log("Metadata:", session.metadata);
 
-                const { transactionId, appId } = session.metadata || {};
+                const { transactionId, appId } =
+                    session.metadata || {};
 
                 if (!transactionId) {
+                    console.log(
+                        "Transaction ID missing in metadata"
+                    );
+
                     return res.status(400).json({
                         success: false,
-                        message: "Transaction ID missing in metadata",
+                        message:
+                            "Transaction ID missing in metadata",
                     });
                 }
 
                 if (appId !== "quickgpt") {
+                    console.log("Invalid App ID:", appId);
+
                     return res.json({
                         received: true,
                         message: "Ignored event: Invalid app",
                     });
                 }
 
-                const transaction = await Transaction.findOne({
-                    _id: transactionId,
-                    isPaid: false,
-                });
+                const transaction =
+                    await Transaction.findOne({
+                        _id: transactionId,
+                        isPaid: false,
+                    });
 
-                console.log("Transaction Found:", transaction);
+                console.log(
+                    "Transaction Found:",
+                    transaction
+                );
 
                 if (!transaction) {
                     return res.json({
                         received: true,
-                        message: "Transaction not found or already paid",
+                        message:
+                            "Transaction not found or already paid",
                     });
                 }
 
-                // Add credits to user
-                await User.updateOne(
-                    { _id: transaction.userId },
-                    {
-                        $inc: {
-                            credits: transaction.credits,
+                const userUpdate =
+                    await User.updateOne(
+                        {
+                            _id: transaction.userId,
                         },
-                    }
+                        {
+                            $inc: {
+                                credits:
+                                    transaction.credits,
+                            },
+                        }
+                    );
+
+                console.log(
+                    "User Credits Updated:",
+                    userUpdate
                 );
 
-                // Mark transaction as paid
                 transaction.isPaid = true;
+
                 await transaction.save();
 
                 console.log(
@@ -86,11 +122,20 @@ export const stripeWebhooks = async (req, res) => {
             }
 
             case "payment_intent.succeeded":
-                console.log("Payment Intent Succeeded");
+                console.log(
+                    "Payment Intent Succeeded"
+                );
+                break;
+
+            case "charge.succeeded":
+                console.log("Charge Succeeded");
                 break;
 
             default:
-                console.log("Unhandled Event Type:", event.type);
+                console.log(
+                    "Unhandled Event Type:",
+                    event.type
+                );
                 break;
         }
 
@@ -98,7 +143,13 @@ export const stripeWebhooks = async (req, res) => {
             received: true,
         });
     } catch (error) {
-        console.error("Webhook Processing Error:", error);
+        console.error(
+            "\n========== PROCESSING ERROR =========="
+        );
+        console.error(error);
+        console.error(
+            "======================================\n"
+        );
 
         return res.status(500).json({
             success: false,
