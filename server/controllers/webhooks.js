@@ -2,20 +2,10 @@ import Stripe from "stripe";
 import Transaction from "../models/Transaction.js";
 import User from "../models/User.js";
 
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+
 export const stripeWebhooks = async (req, res) => {
-    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
-
     const sig = req.headers["stripe-signature"];
-
-    console.log("\n========== WEBHOOK REQUEST ==========");
-    console.log("Signature Header:", sig ? "Present" : "Missing");
-    console.log(
-        "Webhook Secret:",
-        process.env.STRIPE_WEBHOOK_SECRET
-            ? "Present"
-            : "Missing"
-    );
-    console.log("=====================================\n");
 
     let event;
 
@@ -26,134 +16,69 @@ export const stripeWebhooks = async (req, res) => {
             process.env.STRIPE_WEBHOOK_SECRET
         );
 
-        console.log("\n========== WEBHOOK VERIFIED ==========");
-        console.log("Event Type:", event.type);
-        console.log("======================================\n");
-    } catch (error) {
-        console.error("\n========== WEBHOOK ERROR ==========");
-        console.error(error.message);
-        console.error("===================================\n");
+        console.log("Webhook verified:", event.type);
 
-        return res.status(400).send(
-            `Webhook Error: ${error.message}`
-        );
+    } catch (err) {
+        console.error("Webhook signature failed:", err.message);
+        return res.status(400).send(`Webhook Error: ${err.message}`);
     }
 
     try {
-        switch (event.type) {
-            case "checkout.session.completed": {
-                console.log("Checkout Session Completed");
 
-                const session = event.data.object;
+        if (event.type === "checkout.session.completed") {
 
-                console.log("Session ID:", session.id);
-                console.log("Metadata:", session.metadata);
+            const session = event.data.object;
 
-                const { transactionId, appId } =
-                    session.metadata || {};
+            console.log("Metadata:", session.metadata);
 
-                if (!transactionId) {
-                    console.log(
-                        "Transaction ID missing in metadata"
-                    );
+            const transactionId = session.metadata?.transactionId;
+            const appId = session.metadata?.appId;
 
-                    return res.status(400).json({
-                        success: false,
-                        message:
-                            "Transaction ID missing in metadata",
-                    });
-                }
-
-                if (appId !== "quickgpt") {
-                    console.log("Invalid App ID:", appId);
-
-                    return res.json({
-                        received: true,
-                        message: "Ignored event: Invalid app",
-                    });
-                }
-
-                const transaction =
-                    await Transaction.findOne({
-                        _id: transactionId,
-                        isPaid: false,
-                    });
-
-                console.log(
-                    "Transaction Found:",
-                    transaction
-                );
-
-                if (!transaction) {
-                    return res.json({
-                        received: true,
-                        message:
-                            "Transaction not found or already paid",
-                    });
-                }
-
-                const userUpdate =
-                    await User.updateOne(
-                        {
-                            _id: transaction.userId,
-                        },
-                        {
-                            $inc: {
-                                credits:
-                                    transaction.credits,
-                            },
-                        }
-                    );
-
-                console.log(
-                    "User Credits Updated:",
-                    userUpdate
-                );
-
-                transaction.isPaid = true;
-
-                await transaction.save();
-
-                console.log(
-                    `Transaction ${transaction._id} marked as paid`
-                );
-
-                break;
+            if (!transactionId || appId !== "quickgpt") {
+                return res.json({
+                    received: true,
+                    message: "Invalid metadata"
+                });
             }
 
-            case "payment_intent.succeeded":
-                console.log(
-                    "Payment Intent Succeeded"
-                );
-                break;
+            const transaction = await Transaction.findById(transactionId);
 
-            case "charge.succeeded":
-                console.log("Charge Succeeded");
-                break;
+            if (!transaction) {
+                return res.json({
+                    received: true,
+                    message: "Transaction not found"
+                });
+            }
 
-            default:
-                console.log(
-                    "Unhandled Event Type:",
-                    event.type
-                );
-                break;
+            if (transaction.isPaid) {
+                return res.json({
+                    received: true,
+                    message: "Already processed"
+                });
+            }
+
+            await User.updateOne(
+                { _id: transaction.userId },
+                {
+                    $inc: {
+                        credits: transaction.credits
+                    }
+                }
+            );
+
+            transaction.isPaid = true;
+            await transaction.save();
+
+            console.log("Transaction updated:", transactionId);
         }
 
-        return res.json({
-            received: true,
-        });
-    } catch (error) {
-        console.error(
-            "\n========== PROCESSING ERROR =========="
-        );
-        console.error(error);
-        console.error(
-            "======================================\n"
-        );
+        return res.json({ received: true });
 
+    } catch (err) {
+        console.error(err);
         return res.status(500).json({
             success: false,
-            message: error.message,
+            message: err.message
         });
     }
 };
