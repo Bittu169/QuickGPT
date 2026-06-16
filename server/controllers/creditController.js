@@ -10,18 +10,38 @@ const plans = [
         name: "Basic",
         price: 10,
         credits: 100,
+        features: [
+            "100 text generations",
+            "50 image generations",
+            "Standard support",
+            "Access to basic models",
+        ],
     },
     {
         _id: "pro",
         name: "Pro",
         price: 20,
         credits: 500,
+        features: [
+            "500 text generations",
+            "200 image generations",
+            "Priority support",
+            "Access to pro models",
+            "Faster response time",
+        ],
     },
     {
         _id: "premium",
         name: "Premium",
         price: 30,
         credits: 1000,
+        features: [
+            "1000 text generations",
+            "500 image generations",
+            "24/7 VIP support",
+            "Access to premium models",
+            "Dedicated account manager",
+        ],
     },
 ];
 
@@ -33,38 +53,39 @@ export const getPlans = async (req, res) => {
             plans,
         });
     } catch (error) {
-        return res.json({
+        console.error("Get Plans Error:", error);
+
+        return res.status(500).json({
             success: false,
             message: error.message,
+            plans: [],
         });
     }
 };
 
-// PURCHASE PLAN (CREATE STRIPE SESSION)
+// PURCHASE PLAN
 export const purchasePlan = async (req, res) => {
     try {
         const { planId } = req.body;
         const userId = req.user?._id;
 
-        // Validate user
         if (!userId) {
-            return res.json({
+            return res.status(401).json({
                 success: false,
                 message: "User not authenticated",
             });
         }
 
-        // Find plan
-        const plan = plans.find((p) => p._id === planId);
+        const plan = plans.find((item) => item._id === planId);
 
         if (!plan) {
-            return res.json({
+            return res.status(400).json({
                 success: false,
                 message: "Invalid plan selected",
             });
         }
 
-        // Create transaction in DB
+        // Create transaction
         const transaction = await Transaction.create({
             userId,
             planId: plan._id,
@@ -73,9 +94,12 @@ export const purchasePlan = async (req, res) => {
             isPaid: false,
         });
 
-        const origin = req.headers.origin || "http://localhost:5173";
+        const origin =
+            req.headers.origin ||
+            process.env.CLIENT_URL ||
+            "http://localhost:5173";
 
-        // Create Stripe Checkout session
+        // Stripe checkout session
         const session = await stripe.checkout.sessions.create({
             payment_method_types: ["card"],
             mode: "payment",
@@ -86,7 +110,7 @@ export const purchasePlan = async (req, res) => {
                         currency: "usd",
                         unit_amount: plan.price * 100,
                         product_data: {
-                            name: plan.name,
+                            name: `${plan.name} Plan`,
                         },
                     },
                     quantity: 1,
@@ -96,7 +120,6 @@ export const purchasePlan = async (req, res) => {
             success_url: `${origin}/loading`,
             cancel_url: `${origin}`,
 
-            // IMPORTANT: must match webhook logic
             metadata: {
                 transactionId: transaction._id.toString(),
                 appId: "quickgpt",
@@ -111,7 +134,7 @@ export const purchasePlan = async (req, res) => {
     } catch (error) {
         console.error("Purchase Plan Error:", error);
 
-        return res.json({
+        return res.status(500).json({
             success: false,
             message: error.message,
         });
