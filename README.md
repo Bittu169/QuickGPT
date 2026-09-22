@@ -8,7 +8,7 @@ Built using React, Node.js, Express, MongoDB, OpenAI, and Stripe.
 
 ## 🌐 Live Demo
 
-Frontend: https://your-frontend-url.vercel.app
+Frontend: [https://your-frontend-url.vercel.app](https://quick-gpt-beryl-zeta.vercel.app/)
 
 Backend: https://your-backend-url.vercel.app
 
